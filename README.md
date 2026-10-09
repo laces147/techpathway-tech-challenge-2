@@ -1,154 +1,153 @@
-# **Tech Challenge 2 – Full-Stack Deployment with Jenkins, Docker & AWS**
+# TechPathway: Full-Stack Deployment with Jenkins, Docker and AWS
 
-### **Starter Code Repository**
+## Project Overview
 
-You'll be working from this repo, which already includes the React frontend and Express backend you'll deploy:
+This project deploys a React frontend and an Express backend to Amazon ECS using Docker, Amazon ECR, Terraform and Jenkins.
 
-👉 https://github.com/sholaolujobi/techpathway-tech-challenge-2
+The Jenkins pipeline checks out the GitHub repository, verifies AWS access, builds both Docker images, pushes the images to Amazon ECR, and triggers ECS service deployments automatically.
 
-Clone the repo before you start.
+## Live Application
 
-You can modify the code if needed for your pipeline or infrastructure.
+- Frontend: http://techpathway-alb-509339923.us-east-1.elb.amazonaws.com
+- Backend health check: http://techpathway-alb-509339923.us-east-1.elb.amazonaws.com/api/health
 
----
+The frontend displays SUCCESS and a GUID when the application is working. The backend health endpoint should return `{"status":"ok"}`.
 
-## **Challenge Duration**
+## GitHub Repository
 
-You have 96 **hours** from the moment you receive this to complete everything.
+https://github.com/laces147/techpathway-tech-challenge-2
 
----
+## Architecture
 
-## **What You're Being Tested On**
+1. GitHub hosts the application code, Dockerfiles, Jenkinsfile and Terraform configuration.
+2. Jenkins runs on an Amazon EC2 instance and executes the CI/CD pipeline.
+3. Docker builds separate frontend and backend images.
+4. Amazon ECR stores the container images.
+5. Amazon ECS runs the frontend and backend services using AWS Fargate.
+6. An Application Load Balancer provides public access to the application and routes requests to the appropriate service.
+7. Terraform provisions the application infrastructure, including the VPC, subnets, internet gateway, routes, security groups, ECS cluster, task definitions and services.
 
-This challenge checks your understanding of:
+## AWS Resources Supporting Jenkins
 
-- Cloud infrastructure
-- Infrastructure as Code
-- Automated deployments
-- CI/CD concepts
-- Documentation and clarity
+The Jenkins server runs on an Ubuntu EC2 instance in the `us-east-1` region.
 
-You'll take an existing app and turn it into a fully automated deployment pipeline on AWS.
+- EC2 instance: `i-0ccbec15512d3ec57`
+- Instance type: `t3.small`
+- Public Jenkins URL: http://98.80.178.170:8080
+- Security group: `techpathway-jenkins-sg`
+- IAM role: `techpathway-jenkins-ec2-role`
+- IAM instance profile: `techpathway-jenkins-instance-profile`
 
----
+The Jenkins security group permits HTTP access on port 8080 for the challenge and SSH access on port 22 restricted to an authorized IP address.
 
-## **What You Need to Build**
+The EC2 instance has Docker and the AWS CLI installed. Its IAM instance role provides permissions for Amazon ECR image operations and the required ECS deployment operations. The pipeline uses the instance role rather than storing long-lived AWS access keys in Jenkins.
 
-### **1. Jenkins Setup**
+The Jenkins server is publicly accessible for demonstration purposes. Access should be protected with a strong password, and public access should be restricted or removed when the project no longer needs to be available.
 
-- Launch a Jenkins server on AWS.
-- Make sure it's publicly reachable.
-- You can create everything manually (EC2, IAM, permissions, etc.).
-- In your README, include a short description of the AWS resources that support your Jenkins instance.
+## Container Images and ECS Services
 
----
+Amazon ECR repositories:
 
-### **2. Frontend & Backend Deployment**
+- `techpathway-frontend`
+- `techpathway-backend`
 
-Using the code from the repo:
+ECS cluster: `techpathway-cluster`
 
-- Containerize both the frontend and backend
-- Deploy both apps on **AWS ECS**
-- The **frontend must be publicly reachable** in a browser
-- The frontend must successfully call the backend endpoint once deployed
+ECS services:
 
----
+- `techpathway-frontend-service`
+- `techpathway-backend-service`
 
-### **3. CI/CD Pipeline**
+The Jenkins pipeline tags images with the Jenkins build number and `latest`, pushes them to ECR, and triggers a new deployment of both ECS services.
 
-Create a Jenkins pipeline that:
+## CI/CD Pipeline
 
-- Pulls your GitHub repo
-- Builds both Docker images
-- Logs in to ECR
-- Pushes the images
-- Triggers an update on your ECS services so the new versions deploy automatically
+The pipeline is defined in `Jenkinsfile` and includes these stages:
 
-Pipeline should run end-to-end with no manual steps once triggered.
+1. Checkout the GitHub repository.
+2. Verify AWS identity and permissions.
+3. Build the frontend and backend Docker images.
+4. Authenticate to Amazon ECR and push both images.
+5. Trigger deployments for both ECS services and wait for the services to become stable.
 
----
+To deploy, open the Jenkins job `TechPathway-FullStack-Deploy` and select **Build Now**. Jenkins then performs the pipeline stages without requiring manual image builds or ECS updates.
 
-### **4. Terraform Infrastructure**
+## Terraform
 
-Use Terraform to create everything required for your deployment:
+The Terraform configuration is located in the `infra/` directory.
 
-- VPC + subnets
-- Internet access (IGW, route tables)
-- Security groups
-- ECS cluster
-- Task definitions (frontend + backend)
-- ECS services
-- (Optional) ECR repositories
+It defines the AWS networking, internet access, security groups, ECS cluster, task definitions, services and related application infrastructure.
 
-Terraform **does not need** to build your Jenkins server unless you want to.
+To inspect or deploy the infrastructure, use an AWS CLI profile or other approved AWS authentication method with the necessary permissions:
 
----
-
-## **How to Run the App Locally (for Testing)**
-
-**Backend**
-
+```bash
+cd infra
+terraform init
+terraform fmt -check
+terraform validate
+terraform plan
 ```
+
+Review the plan before applying changes. Run `terraform apply` only when you intend to create or update AWS resources. The Terraform state file is required to manage existing resources and must be kept private; it should not be committed to GitHub.
+
+The Jenkins EC2 instance is managed separately from the application Terraform configuration.
+
+## Testing
+
+### Test the deployed frontend
+
+Open the frontend URL in a browser and confirm that the page displays `SUCCESS` and a GUID.
+
+### Test the backend
+
+```bash
+curl http://techpathway-alb-509339923.us-east-1.elb.amazonaws.com/api/health
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
+### Test the CI/CD pipeline
+
+1. Open the Jenkins URL and sign in.
+2. Open `TechPathway-FullStack-Deploy`.
+3. Select **Build Now**.
+4. Open the build's Console Output and confirm that it finishes with `SUCCESS`.
+5. Verify the frontend and backend health endpoint again.
+
+### Run locally
+
+Backend:
+
+```bash
 cd backend
 npm ci
 npm start
 ```
 
-Runs on: `localhost:8080`
+Frontend, in a separate terminal:
 
-**Frontend**
-
-```
+```bash
 cd frontend
 npm ci
 npm start
 ```
 
-Runs on: `localhost:3000`
+The backend runs on `localhost:8080` and the frontend on `localhost:3000`, according to the starter project's configuration.
 
-If everything works, the frontend will show **SUCCESS** and a GUID.
+## Security and Cost Notes
 
----
+Do not commit passwords, private keys, AWS credentials, Terraform state files or sensitive configuration to the public repository.
 
-## **Important Config Files**
+The Jenkins instance, Application Load Balancer, ECS/Fargate tasks and related AWS resources may incur charges while running. Review the resources and remove them when they are no longer required.
 
-- **frontend/src/config.js** → set backend URL
-- **backend/config.js** → CORS settings
+## Project Status
 
----
+The Jenkins pipeline completed successfully and reported:
 
-# **How to Submit**
+`SUCCESS: Frontend and backend images deployed to ECS.`
 
-When you finish, put everything into **one PDF** and upload it in the Slack submission channel.
-
-Your PDF must include:
-
-1. **A screenshot of the deployed frontend**
-
-    (The live app running in the browser.)
-
-2. **A screenshot of your Jenkins pipeline after a successful run**
-3. **Your GitHub repo link**
-
-    This repo must include your Terraform files, Dockerfiles, Jenkinsfile, and any changes you made.
-
-4. **The public URL of your frontend**
-5. **The Jenkins server URL + login details**
-6. **Short, simple instructions**
-
-    A few lines on how to test or deploy your setup.
-
-Once everything is inside the PDF, upload that PDF directly into the Slack channel.
-
-That's your final submission.
-
----
-
-## **How You'll Be Graded**
-
-We'll review your work based on:
-
-- Does the app run successfully on AWS?
-- Does your Jenkins pipeline deploy both apps correctly?
-- Is your Terraform code clean and accurate?
-- How organized and clear is your repo + documentation?
+The deployment was completed as part of Tech Challenge 2.
